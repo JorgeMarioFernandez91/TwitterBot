@@ -9,12 +9,100 @@ import urllib.request
 import time
 from datetime import datetime
 from bs4 import BeautifulSoup
+import json
+
+#check if tweet alread exists in the DB, if so return True else return False
+def tweetExists(input):
+
+	with open('./tempDB.json') as myfile:
+
+		data = json.load(myfile)
+
+		storedTweetID = data['id'][0]
+		print(storedTweetID)
+
+		if (input == storedTweetID):
+			return True
+		else:
+			return False
+
+#reacts to tweets tweeted to the bot account
+#tweets read by bot are in the form of @MarioDevs #MotivateMe / #Space / #Stocks
+def reactToTweet():
+
+	#uses the twitter API to get and store a json file of this accounts timeline
+	os.system('twurl \"/1.1/statuses/mentions_timeline.json?count=1\" > result.json')
+
+	#open the json file, parse, and performs an action depending on tweet
+	with open('./result.json') as myfile:
+
+		data = json.load(myfile)
+
+		#check if this bot has been tweeted to
+		if ('@MarioDevs' in data[0]['text']):
+
+			humanUser = "@" + data[0]['user']['screen_name']
+			tweetID = data[0]['id']
+
+			#if tweet already exists in the DB then do nothing, else determine what tweet info tweet wants
+			if (tweetExists(tweetID) == True):
+
+				print('Already Replied to ' + humanUser)
+
+			else:
+
+				outputID = {}
+				outputID['id'] = [tweetID]
+				#save new tweet to DB for future reference
+				with open('tempDB.json', 'w') as outfile:
+					json.dump(outputID, outfile)
+				#print(json.dumps(data, indent=4))
+
+				#check what the hashtag is asking for and react to it
+				if ('#MotivateMe' in data[0]['text']):
+
+					message = humanUser + " " + scrapeQuote()
+					
+					tweet(message)
+
+					print("Replied to " + humanUser)
+
+				elif ('#Space' in data[0]['text']):
+					print("#Space")
+
+				elif ('#Stocks' in data[0]['text'] or '#Stock' in data[0]['text']):
+
+					string = data[0]['text'].split(' ')[1]
+
+					stockName = string[7:]
+
+					print(stockName)
+
+					result = scrapeStock(str(stockName))
+
+					if (result == 'Error'):
+
+						print("Can't Tweet, Error with Incoming Tweet!")
+
+					else:
+
+						message = humanUser + "\n" + result
+
+						tweet(message)
+
+						print("Replied to " + humanUser)
+
+
+				else:
+					print('Hashtag Not Known')
+		else:
+			print('@MarioDevs Not Mentioned')
 
 #scrapes a quote website for a random quote and tweets it
 def scrapeQuote():
 
 	#generates a random number which will correspond to a list of quotes fetched
-	num = random.randint(1, 20)
+	num = random.randint(0, 20)
 	#url of quote DB
 	url = 'https://www.brainyquote.com/topics/daily'
 	#response from the curl call, request is similar to curl
@@ -31,8 +119,67 @@ def scrapeQuote():
 	message = quote + '\n' + author
 	print(message)
 
-	#tweets the message
-	tweet(message)
+	return message
+
+def scrapeStock(stockName):
+
+	name = stockName.lower()
+
+	url = 'https://www.nasdaq.com/symbol/' + name + '/real-time'
+
+	response = requests.get(url)
+
+	soup = BeautifulSoup(response.text, "html.parser")
+
+	try:
+
+		currPrice = soup.find("div", id="qwidget_lastsale").string
+
+		netChange = soup.find("div", id="qwidget_netchange").string
+
+		changePercent = soup.find("div", id="qwidget_percent").string
+
+		sign = soup.find("div", id="qwidget_netchange")
+
+		if ('Green' in sign):
+
+			netChange = '+' + netChange
+			changePercent = '+' + changePercent
+
+		else:
+
+			netChange = '-' + netChange
+			changePercent = '-' + changePercent
+
+
+		message = 'Name: ' + stockName.upper() + '\n' + \
+				  'Current Price: ' + currPrice + '\n' + \
+				  'Net Change: ' + netChange + '\n' + \
+			  	  'Percent Change: ' + changePercent
+
+		print(message)
+
+		return message
+		
+	except Exception as e:
+
+		print("Error")
+
+		return "Error"
+
+
+def scrapeSpace():
+
+	url = 'https://www.nasa.gov/news/releases/latest/index.html'
+
+	response = requests.get(url)
+
+	soup = BeautifulSoup(response.text, "html.parser")
+
+
+
+	return 2
+
 
 #calls the Twitter API and performs a Tweet 
 def tweet(input):
@@ -47,38 +194,25 @@ def tweet(input):
 
 		i = i + 1
 
-	#this output prints out the json response from twitter to stdout
-	#output = 'twurl -d \'status=' + input + '\' /1.1/statuses/update.json'
-
 	#this output quiets the json response from twitter
-	output = 'twurl -q -d \'status=' + cleanStr + '\' /1.1/statuses/update.json'
-	os.system(output)
+	os.system('twurl -q -d \'status=' + cleanStr + '\' /1.1/statuses/update.json')
 
 #the main function
 def main():
 
+	#reactToTweet()
+	#scrapeStock('TSLA')
+
+	#scrapeStock('GOOGL')
+
+
 	while True:
-		#get time 
-		currTime = datetime.now()
-		hour = currTime.hour
-		minute = currTime.minute
-		second = currTime.second
 
-		#Tweet every hour
-		if (minute % 30 == 0):
-			scrapeQuote()
-			print("Tweet Tweeted!")
+		reactToTweet()
 
-		if (minute < 30):
-			remaining = 30 - int(minute)
-		else:
-			remaining = 60 - int(minute)
+		time.sleep(10)
 
-		print("Waiting... " + str(remaining) + " minute(s) until next Tweet")
-		#sleep for a minute
-		time.sleep(60)
 
 #calls the main
 if __name__=="__main__":
 	main()
-
