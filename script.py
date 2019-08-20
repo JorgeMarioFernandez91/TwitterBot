@@ -70,28 +70,27 @@ def reactToTweet():
 				elif ('#Space' in data[0]['text']):
 					print("#Space")
 
-				elif ('#Stocks' in data[0]['text'] or '#Stock' in data[0]['text']):
-
+				elif ('#Stock' in data[0]['text']):
+					#extract the hashtag from the string
 					string = data[0]['text'].split(' ')[1]
-
-					stockName = string[7:]
-
-					print(stockName)
+					#check if hashtag ends with 's' or not
+					if ('#Stocks' in string):
+						stockName = string[7:]
+					else:
+						stockName = string[6:]
 
 					result = scrapeStock(str(stockName))
 
+					#scrapeStock will return an 'Error' string if unable to get stock
 					if (result == 'Error'):
-
 						print("Can't Tweet, Error with Incoming Tweet!")
 
 					else:
-
 						message = humanUser + "\n" + result
 
 						tweet(message)
 
 						print("Replied to " + humanUser)
-
 
 				else:
 					print('Hashtag Not Known')
@@ -122,7 +121,7 @@ def scrapeQuote():
 	return message
 
 def scrapeStock(stockName):
-
+	#turn stockName to lower case in order to use in url which requires a lower case name
 	name = stockName.lower()
 
 	url = 'https://www.nasdaq.com/symbol/' + name + '/real-time'
@@ -130,24 +129,20 @@ def scrapeStock(stockName):
 	response = requests.get(url)
 
 	soup = BeautifulSoup(response.text, "html.parser")
-
+	#try to get 'div' elements from webpage, if error then catch the exception and handle
 	try:
 
 		currPrice = soup.find("div", id="qwidget_lastsale").string
-
 		netChange = soup.find("div", id="qwidget_netchange").string
-
 		changePercent = soup.find("div", id="qwidget_percent").string
-
+		#positive or negative sign determines if stock is increasing or decreasing
 		sign = soup.find("div", id="qwidget_netchange")
 
+		#if there's a positive change then add a '+' to front of respective strings else add '-'
 		if ('Green' in sign):
-
 			netChange = '+' + netChange
 			changePercent = '+' + changePercent
-
 		else:
-
 			netChange = '-' + netChange
 			changePercent = '-' + changePercent
 
@@ -163,10 +158,7 @@ def scrapeStock(stockName):
 		
 	except Exception as e:
 
-		print("Error")
-
 		return "Error"
-
 
 def scrapeSpace():
 
@@ -176,10 +168,7 @@ def scrapeSpace():
 
 	soup = BeautifulSoup(response.text, "html.parser")
 
-
-
 	return 2
-
 
 #calls the Twitter API and performs a Tweet 
 def tweet(input):
@@ -202,16 +191,12 @@ def main():
 
 	#reactToTweet()
 	#scrapeStock('TSLA')
-
 	#scrapeStock('GOOGL')
-
 
 	while True:
 
 		reactToTweet()
-
 		time.sleep(10)
-
 
 #calls the main
 if __name__=="__main__":
